@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 #include "pcapreader.h"
+#include "structs.h"
 #define SESSION_KEY_LENGTH  40
 
 static uint8_t SESSIONKEY[SESSION_KEY_LENGTH];
@@ -31,8 +32,42 @@ const char* addrToStr(int addr)
     return buffer;
 }
 
+static struct tcp_connection **connections = NULL;
+static uint32_t connection_count = 0;
 void handleTcpPacket(uint32_t from, uint32_t to, struct sniff_tcp_t *tcppacket)
 {
+    struct tcp_connection *connection = NULL;
+    for(uint8_t i=0; i< connection_count; ++i)
+    {
+        if(connections[i]->from == from && connections[i]->to == to &&
+                connections[i]->src_port == tcppacket->th_sport && connections[i]->dst_port == tcppacket->th_dport)
+        {
+            connection = connections[i];
+            break;
+        }
+    }
+    // not found, create new?
+    if(connection==NULL)
+    {
+        if(tcppacket->th_flags & TH_SYN)
+        {
+            connection = malloc(sizeof(struct tcp_connection));
+            connection_count++;
+            connections = realloc(connections, sizeof(struct tcp_connection*)*connection_count);
+            connections[connection_count-1] = connection;
+
+            connection->from = from;
+            connection->to = to;
+            connection->src_port= tcppacket->th_sport;
+            connection->dst_port= tcppacket->th_dport;
+            connection->state = SYNED;
+        }
+        else
+        {
+            printf("got tcppacket without syn flag and couldn't find any connection - ignored\n");
+        }
+        return;
+    }
 }
 
 void parsePcapFile(const char* filename)
