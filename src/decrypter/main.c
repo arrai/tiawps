@@ -39,8 +39,11 @@ void handleTcpPacket(uint32_t from, uint32_t to, struct sniff_tcp_t *tcppacket)
     struct tcp_connection *connection = NULL;
     for(uint8_t i=0; i< connection_count; ++i)
     {
-        if(connections[i]->from == from && connections[i]->to == to &&
-                connections[i]->src_port == tcppacket->th_sport && connections[i]->dst_port == tcppacket->th_dport)
+        if((connections[i]->from == from && connections[i]->to == to &&
+                    connections[i]->src_port == tcppacket->th_sport && connections[i]->dst_port == tcppacket->th_dport)
+            ||
+            (connections[i]->from == to && connections[i]->to == from &&
+             connections[i]->src_port == tcppacket->th_dport && connections[i]->dst_port == tcppacket->th_sport))
         {
             connection = connections[i];
             break;
@@ -49,7 +52,7 @@ void handleTcpPacket(uint32_t from, uint32_t to, struct sniff_tcp_t *tcppacket)
     // not found, create new?
     if(connection==NULL)
     {
-        if(tcppacket->th_flags & TH_SYN)
+        if(tcppacket->th_flags == TH_SYN)
         {
             connection = malloc(sizeof(struct tcp_connection));
             connection_count++;
@@ -61,12 +64,25 @@ void handleTcpPacket(uint32_t from, uint32_t to, struct sniff_tcp_t *tcppacket)
             connection->src_port= tcppacket->th_sport;
             connection->dst_port= tcppacket->th_dport;
             connection->state = SYNED;
+
+            printf("New connection, now tracking %u\n", connection_count);
         }
         else
         {
-            printf("got tcppacket without syn flag and couldn't find any connection - ignored\n");
+            printf("got non-initial tcppacket and couldn't find any associated connection - ignored\n");
         }
         return;
+    }
+    switch(connection->state)
+    {
+        case SYNED:
+            break;
+        case SYNACKED:
+            break;
+        case ESTABLISHED:
+            break;
+        case ACTIVE:
+            break;
     }
 }
 
@@ -121,7 +137,7 @@ void parsePcapFile(const char* filename)
                     handleTcpPacket(ipframe->ip_src.s_addr, ipframe->ip_dst.s_addr, tcppacket);
                 }
             }
-            exit(0);
+///            exit(0);
         }
         free(data);
     }
