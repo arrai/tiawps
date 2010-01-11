@@ -27,12 +27,23 @@ pcap_hdr_t* readPcapHeader(FILE *f)
     return header;
 }
 
-pcaprec_hdr_t* readNextPacket(FILE *f)
+int readNextPacket(FILE *f, pcaprec_hdr_t* header, uint8_t **data)
 {
-    pcaprec_hdr_t *header = malloc(sizeof(pcaprec_hdr_t));
     if(fread(header, sizeof(pcaprec_hdr_t), 1, f)!=1)
     {
-        FREE_RETURN
+        return 0;
     }
-    return header;
+    *data = malloc(header->incl_len);
+    if(*data == NULL)
+    {
+        printf("couldn't allocate %u bytes of memory\n", header->incl_len);
+        return 0;
+    }
+    if(fread(*data, header->incl_len, 1, f) != 1)
+    {
+        printf("Couldn't read packet data\n");
+        free(*data);
+        return 0;
+    }
+    return 1;
 }

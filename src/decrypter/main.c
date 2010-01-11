@@ -15,13 +15,24 @@ void readSessionkey(const char* file)
         exit(1);
     }
     const int expectedBytes = sizeof(SESSIONKEY);
-    int readBytes = fread(SESSIONKEY, 1, expectedBytes, fp);
-    if(readBytes != expectedBytes)
+    int readCount = fread(SESSIONKEY, 1, expectedBytes, fp);
+    if(readCount != expectedBytes)
     {
         printf("Couldn't read %u bytes from keyfile %s\n", expectedBytes, file);
         exit(1);
     }
     fclose(fp);
+}
+
+const char* addrToStr(int addr)
+{
+    static char buffer[3+1+3+1+3+1+3];
+    sprintf(buffer, "%d.%d.%d.%d", 0xFF&(addr>>3*8), 0xFF&(addr>>2*8), 0xFF&(addr>>8), 0xFF&(addr));
+    return buffer;
+}
+
+void handleTcpPacket(uint32_t from, uint32_t to, sniff_tcp_t *tcppacket)
+{
 }
 
 void parsePcapFile(const char* filename)
@@ -36,11 +47,48 @@ void parsePcapFile(const char* filename)
     if(!header)
         exit(1);
 
-    pcaprec_hdr_t *packet;
-
-    while(packet = readNextPacket(fd))
+    if(header->network != DLT_EN10MB)
     {
-        free(packet);
+        printf("network link layer %u is not supported, currently only ethernet is implemented\n", header->network);
+        exit(1);
+    }
+
+    pcaprec_hdr_t packet;
+    uint8_t *data;
+    while(readNextPacket(fd, &packet, &data))
+    {
+        sniff_ethernet_t *etherframe = (sniff_ethernet_t*)data;
+        if(etherframe->ether_type == ETHER_TYPE_IP)
+        {
+            sniff_ip_t *ipframe = (sniff_ip_t*)(data+sizeof(sniff_ethernet_t));
+            if(IP_V(ipframe)!=4)
+            {
+                printf("skipped ip v%u frame\n", IP_V(ipframe));
+            }
+            else
+            {
+                printf("ip packet len=%u from %s", ntohs(ipframe->ip_len), addrToStr(ntohl(ipframe->ip_src.s_addr)));
+                printf(" to %s\n", addrToStr(ntohl(ipframe->ip_dst.s_addr)));
+                uint32_t size_ip = IP_HL(ipframe)*4;
+                if(size_ip<20)
+                {
+                    printf("size_ip is %u, <20\n", size_ip);
+                }
+                else if(ipframe->ip_p != TRANSPORT_TYPE_TCP)
+                {
+                    printf("skipping non-tcp frame\n");
+                }
+                else
+                {
+                    sniff_tcp_t *tcppacket = (sniff_tcp_t*)(data+sizeof(sniff_ethernet_t)+size_ip);
+                    printf("th_sport: %u\n", ntohs(tcppacket->th_sport));
+                    printf("th_dport: %u\n", ntohs(tcppacket->th_dport));
+                    handleTcpPacket(ipframe->ip_src.s_addr, ipframe->ip_dst.s_addr, tcppacket);
+                }
+            }
+            exit(0);
+        }
+        free(data);
     }
 
     free(header);
@@ -56,4 +104,5 @@ int main(int argc, char *argv[])
     
     readSessionkey(argv[2]);
     parsePcapFile(argv[1]);
+    return 0;
 }
