@@ -5,10 +5,10 @@
 
 #define FREE_RETURN free(header);return NULL;
 
-pcap_hdr_t* readPcapHeader(FILE *f)
+struct pcap_hdr_t* readPcapHeader(FILE *f)
 {
-    pcap_hdr_t *header = malloc(sizeof(pcap_hdr_t));
-    int readElements= fread(header, sizeof(pcap_hdr_t), 1, f);
+    struct pcap_hdr_t *header = malloc(sizeof(struct pcap_hdr_t));
+    int readElements= fread(header, sizeof(struct pcap_hdr_t), 1, f);
     if(readElements< 1)
     {
         printf("pcap file doesn't have enough bytes to read header\n");
@@ -27,9 +27,9 @@ pcap_hdr_t* readPcapHeader(FILE *f)
     return header;
 }
 
-int readNextPacket(FILE *f, pcaprec_hdr_t* header, uint8_t **data)
+int readNextPacket(FILE *f, struct pcaprec_hdr_t* header, uint8_t **data)
 {
-    if(fread(header, sizeof(pcaprec_hdr_t), 1, f)!=1)
+    if(fread(header, sizeof(struct pcaprec_hdr_t), 1, f)!=1)
     {
         return 0;
     }

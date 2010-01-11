@@ -31,7 +31,7 @@ const char* addrToStr(int addr)
     return buffer;
 }
 
-void handleTcpPacket(uint32_t from, uint32_t to, sniff_tcp_t *tcppacket)
+void handleTcpPacket(uint32_t from, uint32_t to, struct sniff_tcp_t *tcppacket)
 {
 }
 
@@ -43,7 +43,7 @@ void parsePcapFile(const char* filename)
         printf("Couldn't open pcap file %s\n", filename);
         exit(1);
     }
-    pcap_hdr_t *header = readPcapHeader(fd);
+    struct pcap_hdr_t *header = readPcapHeader(fd);
     if(!header)
         exit(1);
 
@@ -53,14 +53,14 @@ void parsePcapFile(const char* filename)
         exit(1);
     }
 
-    pcaprec_hdr_t packet;
+    struct pcaprec_hdr_t packet;
     uint8_t *data;
     while(readNextPacket(fd, &packet, &data))
     {
-        sniff_ethernet_t *etherframe = (sniff_ethernet_t*)data;
+        struct sniff_ethernet_t *etherframe = (struct sniff_ethernet_t*)data;
         if(etherframe->ether_type == ETHER_TYPE_IP)
         {
-            sniff_ip_t *ipframe = (sniff_ip_t*)(data+sizeof(sniff_ethernet_t));
+            struct sniff_ip_t *ipframe = (struct sniff_ip_t*)(data+sizeof(struct sniff_ethernet_t));
             if(IP_V(ipframe)!=4)
             {
                 printf("skipped ip v%u frame\n", IP_V(ipframe));
@@ -80,7 +80,7 @@ void parsePcapFile(const char* filename)
                 }
                 else
                 {
-                    sniff_tcp_t *tcppacket = (sniff_tcp_t*)(data+sizeof(sniff_ethernet_t)+size_ip);
+                    struct sniff_tcp_t *tcppacket = (struct sniff_tcp_t*)(data+sizeof(struct sniff_ethernet_t)+size_ip);
                     printf("th_sport: %u\n", ntohs(tcppacket->th_sport));
                     printf("th_dport: %u\n", ntohs(tcppacket->th_dport));
                     handleTcpPacket(ipframe->ip_src.s_addr, ipframe->ip_dst.s_addr, tcppacket);
