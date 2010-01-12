@@ -2,10 +2,15 @@
 #include <netinet/in.h>
 
 #define PCAP_MAGIC          0xa1b2c3d4
+
 #define DLT_EN10MB          1
+#define WTAP_ENCAP_SCCP     101
+
 #define ETHER_TYPE_IP       8
-#define TRANSPORT_TYPE_TCP  6
 #define ETHER_ADDR_LEN  6
+
+#define TRANSPORT_TYPE_TCP  6
+
 
 struct pcap_hdr_t {
     uint32_t magic_number;   /* magic number */

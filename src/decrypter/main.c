@@ -98,9 +98,9 @@ void parsePcapFile(const char* filename)
     if(!header)
         exit(1);
 
-    if(header->network != DLT_EN10MB)
+    if(header->network != DLT_EN10MB && header->network != WTAP_ENCAP_SCCP)
     {
-        printf("network link layer %u is not supported, currently only ethernet is implemented\n", header->network);
+        printf("network link layer %u is not supported, currently only ethernet and SCCP are implemented\n", header->network);
         exit(1);
     }
 
@@ -108,36 +108,50 @@ void parsePcapFile(const char* filename)
     uint8_t *data;
     while(readNextPacket(fd, &packet, &data))
     {
-        struct sniff_ethernet_t *etherframe = (struct sniff_ethernet_t*)data;
-        if(etherframe->ether_type == ETHER_TYPE_IP)
+        uint32_t ip_data_offset = 0;
+        switch(header->network)
         {
-            struct sniff_ip_t *ipframe = (struct sniff_ip_t*)(data+sizeof(struct sniff_ethernet_t));
-            if(IP_V(ipframe)!=4)
+            case DLT_EN10MB:
             {
-                printf("skipped ip v%u frame\n", IP_V(ipframe));
+                struct sniff_ethernet_t *etherframe = (struct sniff_ethernet_t*)data;
+                if(etherframe->ether_type == ETHER_TYPE_IP)
+                {
+                    free(data);
+                    ip_data_offset = sizeof(struct sniff_ethernet_t);
+                    continue;
+                }
+            }
+            break;
+            // no additional handling required, ip header is next
+            case WTAP_ENCAP_SCCP:
+            break;
+        }
+
+        struct sniff_ip_t *ipframe = (struct sniff_ip_t*)(data+ip_data_offset);
+        if(IP_V(ipframe)!=4)
+        {
+            printf("skipped ip v%u frame\n", IP_V(ipframe));
+        }
+        else
+        {
+            printf("ip packet len=%u from %s", ntohs(ipframe->ip_len), addrToStr(ntohl(ipframe->ip_src.s_addr)));
+            printf(" to %s\n", addrToStr(ntohl(ipframe->ip_dst.s_addr)));
+            uint32_t size_ip = IP_HL(ipframe)*4;
+            if(size_ip<20)
+            {
+                printf("size_ip is %u, <20\n", size_ip);
+            }
+            else if(ipframe->ip_p != TRANSPORT_TYPE_TCP)
+            {
+                printf("skipping non-tcp frame\n");
             }
             else
             {
-                printf("ip packet len=%u from %s", ntohs(ipframe->ip_len), addrToStr(ntohl(ipframe->ip_src.s_addr)));
-                printf(" to %s\n", addrToStr(ntohl(ipframe->ip_dst.s_addr)));
-                uint32_t size_ip = IP_HL(ipframe)*4;
-                if(size_ip<20)
-                {
-                    printf("size_ip is %u, <20\n", size_ip);
-                }
-                else if(ipframe->ip_p != TRANSPORT_TYPE_TCP)
-                {
-                    printf("skipping non-tcp frame\n");
-                }
-                else
-                {
-                    struct sniff_tcp_t *tcppacket = (struct sniff_tcp_t*)(data+sizeof(struct sniff_ethernet_t)+size_ip);
-                    printf("th_sport: %u\n", ntohs(tcppacket->th_sport));
-                    printf("th_dport: %u\n", ntohs(tcppacket->th_dport));
-                    handleTcpPacket(ipframe->ip_src.s_addr, ipframe->ip_dst.s_addr, tcppacket);
-                }
+                struct sniff_tcp_t *tcppacket = (struct sniff_tcp_t*)(data+ip_data_offset+size_ip);
+                printf("th_sport: %u\n", ntohs(tcppacket->th_sport));
+                printf("th_dport: %u\n", ntohs(tcppacket->th_dport));
+                handleTcpPacket(ipframe->ip_src.s_addr, ipframe->ip_dst.s_addr, tcppacket);
             }
-///            exit(0);
         }
         free(data);
     }
