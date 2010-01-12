@@ -116,8 +116,12 @@ void parsePcapFile(const char* filename)
                 struct sniff_ethernet_t *etherframe = (struct sniff_ethernet_t*)data;
                 if(etherframe->ether_type == ETHER_TYPE_IP)
                 {
-                    free(data);
                     ip_data_offset = sizeof(struct sniff_ethernet_t);
+                }
+                else
+                {
+                    printf("Skipping non-ip ethernet payload\n");
+                    free(data);
                     continue;
                 }
             }
