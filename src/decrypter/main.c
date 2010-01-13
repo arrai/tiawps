@@ -63,7 +63,20 @@ void handleTcpPacket(uint32_t from, uint32_t to, struct sniff_tcp_t *tcppacket)
             connection->to = to;
             connection->src_port= tcppacket->th_sport;
             connection->dst_port= tcppacket->th_dport;
+            connection->src_start_seq = ntohl(tcppacket->th_seq);
+            printf("start_seq = %u\n", connection->src_start_seq);
+
             connection->state = SYNED;
+
+            connection->src_data.buffer= NULL;
+            connection->src_data.buffersize= 0;
+            connection->dst_data.buffer= NULL;
+            connection->dst_data.buffersize= 0;
+
+            connection->src_timeinfo.info = NULL;
+            connection->src_timeinfo.entries= 0;
+            connection->dst_timeinfo.info = NULL;
+            connection->dst_timeinfo.entries= 0;
 
             printf("New connection, now tracking %u\n", connection_count);
         }
@@ -76,11 +89,32 @@ void handleTcpPacket(uint32_t from, uint32_t to, struct sniff_tcp_t *tcppacket)
     switch(connection->state)
     {
         case SYNED:
+            if(connection->to == from && tcppacket->th_flags == (TH_SYN|TH_ACK) &&
+                    ntohl(tcppacket->th_ack) == connection->src_start_seq+1)
+            {
+                printf("connection changed state: SYNACKED\n");
+                connection->state = SYNACKED;
+                connection->dst_start_seq = ntohl(tcppacket->th_seq);
+                return;
+            }
             break;
         case SYNACKED:
+            if(connection->to == to && tcppacket->th_flags == (TH_ACK) &&
+                    ntohl(tcppacket->th_ack)==connection->dst_start_seq+1)
+            {
+                printf("connection changed state: ESTABLISHED\n");
+                connection->state = ESTABLISHED;
+                return;
+            }
             break;
         case ESTABLISHED:
+        {
+        // check if we got the wow magic bytes
+            uint8_t *payload = (uint8_t*)tcppacket;
+            payload += 32;//TH_OFF(tcppacket)*4;
+            printf("payload: %u\n", (uint32_t)(*payload));
             break;
+        }
         case ACTIVE:
             break;
     }
@@ -152,8 +186,8 @@ void parsePcapFile(const char* filename)
             else
             {
                 struct sniff_tcp_t *tcppacket = (struct sniff_tcp_t*)(data+ip_data_offset+size_ip);
-                printf("th_sport: %u\n", ntohs(tcppacket->th_sport));
-                printf("th_dport: %u\n", ntohs(tcppacket->th_dport));
+                printf("    th_sport: %u\n", ntohs(tcppacket->th_sport));
+                printf("    th_dport: %u\n", ntohs(tcppacket->th_dport));
                 handleTcpPacket(ipframe->ip_src.s_addr, ipframe->ip_dst.s_addr, tcppacket);
             }
         }

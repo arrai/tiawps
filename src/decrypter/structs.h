@@ -15,12 +15,26 @@ struct growing_array
     uint32_t buffersize;
 };
 
+struct time_information
+{
+    uint32_t sequence;
+    uint32_t epoch_secs;
+    uint32_t epoch_micro;
+};
+
+struct time_information_array
+{
+    struct time_information *info;
+    uint32_t entries;
+};
+
 struct tcp_connection
 {
     uint32_t from, to;
     uint16_t src_port, dst_port;
-    uint32_t src_seq, dst_seq;
+    uint32_t src_start_seq, dst_start_seq;
     enum tcp_state state;
     struct growing_array src_data, dst_data;
+    struct time_information_array src_timeinfo, dst_timeinfo;
 };
 
