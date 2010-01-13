@@ -35,9 +35,76 @@ const char* addrToStr(int addr)
     return buffer;
 }
 
-void appendPayload(struct tcp_participant *participant, uint64_t epoch_micro_secs, uint16_t payload_size, uint8_t *payload, uint32_t seq)
+void addTimeInfo(struct time_information_array *info_array, uint32_t seq, uint64_t epoch_micro_secs)
 {
-    uint32_t arrayStartIndex = seq-(participant->start_seq+1);
+    for(uint32_t i=0; i<info_array->entries; ++i)
+    {
+        if(info_array->info[i].sequence > seq)
+        {
+            info_array->entries++;
+            info_array->info = realloc(info_array->info, info_array->entries*sizeof(struct time_information));
+
+            memmove(info_array->info+(i+1)*sizeof(struct time_information),
+                    info_array->info+i*sizeof(struct time_information),
+                    sizeof(struct time_information)*(info_array->entries-i));
+            info_array->info[i].sequence = seq;
+            info_array->info[i].epoch_micro = epoch_micro_secs;
+            return;
+        }
+        else if(info_array->info[i].sequence == seq)
+        {
+            info_array->info[i].epoch_micro = epoch_micro_secs;
+            return;
+        }
+    }
+    info_array->entries++;
+    // append to end
+    info_array->info = realloc(info_array->info, info_array->entries*sizeof(struct time_information));
+    info_array->info[info_array->entries-1].sequence = seq;
+    info_array->info[info_array->entries-1].epoch_micro = epoch_micro_secs;
+}
+
+void dumpTimeInfo(struct time_information_array *array)
+{
+    for(uint32_t i=0; i<array->entries; ++i)
+    {
+        printf("        info[%u].seq = %u\n", i, array->info[i].sequence);
+    }
+}
+
+void dumpDataInfo(struct growing_array *array)
+{
+    FILE *file = fopen("data.out", "w");
+    if(!file)
+    {
+        printf("fopen failed\n");
+        return;
+    }
+    fwrite(array->buffer, 1, array->buffersize, file);
+    fclose(file);
+}
+
+void addPayload(struct growing_array *array, uint32_t arrayIndex, uint8_t *payload, uint16_t payload_size)
+{
+    if(array->buffersize < arrayIndex+payload_size)
+    {
+        array->buffersize = arrayIndex+payload_size;
+        array->buffer = realloc(array->buffer, array->buffersize);
+    }
+    memcpy(array->buffer+arrayIndex, payload, payload_size);
+#ifdef DEBUG
+    dumpDataInfo(array);
+#endif
+}
+
+void registerTcpPayload(struct tcp_participant *participant, uint64_t epoch_micro_secs, uint16_t payload_size, uint8_t *payload, uint32_t seq)
+{
+    uint32_t arrayIndex = seq-(participant->start_seq+1);
+    addTimeInfo(&participant->timeinfo, arrayIndex, epoch_micro_secs);
+    addPayload(&participant->data, arrayIndex, payload, payload_size);
+#ifdef DEBUG
+    dumpTimeInfo(&participant->timeinfo);
+#endif
 }
 
 static struct tcp_connection **connections = NULL;
@@ -46,6 +113,8 @@ void removeConnection(struct tcp_connection *connection)
 {
     // TODO: implement me
     connection->state = SYNED;
+    printf("called unimplemented function removeConnection. bye.\n");
+    exit(1);
 }
 
 void handleTcpPacket(uint32_t from, uint32_t to, uint16_t tcp_len, struct sniff_tcp_t *tcppacket, uint64_t epoch_micro_secs)
@@ -150,7 +219,7 @@ void handleTcpPacket(uint32_t from, uint32_t to, uint16_t tcp_len, struct sniff_
                     participant = &connection->from;
                 else
                     participant = &connection->to;
-                appendPayload(participant, epoch_micro_secs, payload_size, payload, tcppacket->th_seq);
+                registerTcpPayload(participant, epoch_micro_secs, payload_size, payload, ntohl(tcppacket->th_seq));
             }
             break;
         }

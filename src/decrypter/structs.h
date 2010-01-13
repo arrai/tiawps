@@ -18,8 +18,7 @@ struct growing_array
 struct time_information
 {
     uint32_t sequence;
-    uint32_t epoch_secs;
-    uint32_t epoch_micro;
+    uint64_t epoch_micro;
 };
 
 struct time_information_array
