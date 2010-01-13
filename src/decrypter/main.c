@@ -1,13 +1,16 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "pcapreader.h"
 #include "structs.h"
+
 #define SESSION_KEY_LENGTH  40
+const uint8_t MAGIC_WOW_START[] = {0x00, 0x06, 0xEC, 0x01};
 
 static uint8_t SESSIONKEY[SESSION_KEY_LENGTH];
 
-void readSessionkey(const char* file)
+void readSessionkeyFile(const char* file)
 {
     FILE *fp = fopen(file, "r");
     if(!fp)
@@ -32,25 +35,36 @@ const char* addrToStr(int addr)
     return buffer;
 }
 
+void appendPayload(struct tcp_participant *participant, uint64_t epoch_micro_secs, uint16_t payload_size, uint8_t *payload, uint32_t seq)
+{
+    uint32_t arrayStartIndex = seq-(participant->start_seq+1);
+}
+
 static struct tcp_connection **connections = NULL;
 static uint32_t connection_count = 0;
-void handleTcpPacket(uint32_t from, uint32_t to, struct sniff_tcp_t *tcppacket)
+void removeConnection(struct tcp_connection *connection)
+{
+    // TODO: implement me
+    connection->state = SYNED;
+}
+
+void handleTcpPacket(uint32_t from, uint32_t to, uint16_t tcp_len, struct sniff_tcp_t *tcppacket, uint64_t epoch_micro_secs)
 {
     struct tcp_connection *connection = NULL;
     for(uint8_t i=0; i< connection_count; ++i)
     {
-        if((connections[i]->from == from && connections[i]->to == to &&
-                    connections[i]->src_port == tcppacket->th_sport && connections[i]->dst_port == tcppacket->th_dport)
+        if((connections[i]->from.address == from && connections[i]->to.address == to &&
+                    connections[i]->from.port == tcppacket->th_sport && connections[i]->to.port == tcppacket->th_dport)
             ||
-            (connections[i]->from == to && connections[i]->to == from &&
-             connections[i]->src_port == tcppacket->th_dport && connections[i]->dst_port == tcppacket->th_sport))
+            (connections[i]->from.address == to && connections[i]->to.address == from &&
+             connections[i]->from.port == tcppacket->th_dport && connections[i]->to.port == tcppacket->th_sport))
         {
             connection = connections[i];
             break;
         }
     }
     // not found, create new?
-    if(connection==NULL)
+    if(connection == NULL)
     {
         if(tcppacket->th_flags == TH_SYN)
         {
@@ -59,24 +73,24 @@ void handleTcpPacket(uint32_t from, uint32_t to, struct sniff_tcp_t *tcppacket)
             connections = realloc(connections, sizeof(struct tcp_connection*)*connection_count);
             connections[connection_count-1] = connection;
 
-            connection->from = from;
-            connection->to = to;
-            connection->src_port= tcppacket->th_sport;
-            connection->dst_port= tcppacket->th_dport;
-            connection->src_start_seq = ntohl(tcppacket->th_seq);
-            printf("start_seq = %u\n", connection->src_start_seq);
+            connection->from.address = from;
+            connection->to.address = to;
+            connection->from.port= tcppacket->th_sport;
+            connection->to.port= tcppacket->th_dport;
+            connection->from.start_seq = ntohl(tcppacket->th_seq);
+            printf("start_seq = %u\n", connection->from.start_seq);
 
             connection->state = SYNED;
 
-            connection->src_data.buffer= NULL;
-            connection->src_data.buffersize= 0;
-            connection->dst_data.buffer= NULL;
-            connection->dst_data.buffersize= 0;
+            connection->to.data.buffer= NULL;
+            connection->from.data.buffersize= 0;
+            connection->to.data.buffer= NULL;
+            connection->from.data.buffersize= 0;
 
-            connection->src_timeinfo.info = NULL;
-            connection->src_timeinfo.entries= 0;
-            connection->dst_timeinfo.info = NULL;
-            connection->dst_timeinfo.entries= 0;
+            connection->from.timeinfo.info = NULL;
+            connection->from.timeinfo.entries= 0;
+            connection->to.timeinfo.info = NULL;
+            connection->to.timeinfo.entries= 0;
 
             printf("New connection, now tracking %u\n", connection_count);
         }
@@ -89,18 +103,18 @@ void handleTcpPacket(uint32_t from, uint32_t to, struct sniff_tcp_t *tcppacket)
     switch(connection->state)
     {
         case SYNED:
-            if(connection->to == from && tcppacket->th_flags == (TH_SYN|TH_ACK) &&
-                    ntohl(tcppacket->th_ack) == connection->src_start_seq+1)
+            if(connection->to.address == from && tcppacket->th_flags == (TH_SYN|TH_ACK) &&
+                    ntohl(tcppacket->th_ack) == connection->from.start_seq+1)
             {
                 printf("connection changed state: SYNACKED\n");
                 connection->state = SYNACKED;
-                connection->dst_start_seq = ntohl(tcppacket->th_seq);
+                connection->to.start_seq = ntohl(tcppacket->th_seq);
                 return;
             }
             break;
         case SYNACKED:
-            if(connection->to == to && tcppacket->th_flags == (TH_ACK) &&
-                    ntohl(tcppacket->th_ack)==connection->dst_start_seq+1)
+            if(connection->to.address == to && tcppacket->th_flags == (TH_ACK) &&
+                    ntohl(tcppacket->th_ack)==connection->to.start_seq+1)
             {
                 printf("connection changed state: ESTABLISHED\n");
                 connection->state = ESTABLISHED;
@@ -108,15 +122,38 @@ void handleTcpPacket(uint32_t from, uint32_t to, struct sniff_tcp_t *tcppacket)
             }
             break;
         case ESTABLISHED:
+        case ACTIVE:
         {
-        // check if we got the wow magic bytes
+            uint8_t tcp_header_size = TH_OFF(tcppacket)*4;
             uint8_t *payload = (uint8_t*)tcppacket;
-            payload += 32;//TH_OFF(tcppacket)*4;
-            printf("payload: %u\n", (uint32_t)(*payload));
+            payload += tcp_header_size;
+            if(connection->state != ACTIVE)
+            {
+                // check if we got the wow magic bytes
+                if(memcmp(payload, MAGIC_WOW_START, sizeof(MAGIC_WOW_START))==0)
+                {
+                    connection->state = ACTIVE;
+                    printf("connection changed state: ACTIVE\n");
+                }
+                else
+                {
+                    removeConnection(connection);
+                    return;
+                }
+            }
+            uint32_t payload_size = tcp_len - tcp_header_size;
+            printf("    payload_size : %u\n", payload_size);
+            if(payload_size)
+            {
+                struct tcp_participant *participant;
+                if(from == connection->from.address && tcppacket->th_sport == connection->from.port)
+                    participant = &connection->from;
+                else
+                    participant = &connection->to;
+                appendPayload(participant, epoch_micro_secs, payload_size, payload, tcppacket->th_seq);
+            }
             break;
         }
-        case ACTIVE:
-            break;
     }
 }
 
@@ -188,7 +225,10 @@ void parsePcapFile(const char* filename)
                 struct sniff_tcp_t *tcppacket = (struct sniff_tcp_t*)(data+ip_data_offset+size_ip);
                 printf("    th_sport: %u\n", ntohs(tcppacket->th_sport));
                 printf("    th_dport: %u\n", ntohs(tcppacket->th_dport));
-                handleTcpPacket(ipframe->ip_src.s_addr, ipframe->ip_dst.s_addr, tcppacket);
+                uint64_t micro_epoch = packet.ts_sec;
+                micro_epoch *= 1000000;
+                micro_epoch += packet.ts_usec;
+                handleTcpPacket(ipframe->ip_src.s_addr, ipframe->ip_dst.s_addr, ntohs(ipframe->ip_len)-size_ip, tcppacket, micro_epoch);
             }
         }
         free(data);
@@ -205,7 +245,7 @@ int main(int argc, char *argv[])
         return 1;
     }
     
-    readSessionkey(argv[2]);
+    readSessionkeyFile(argv[2]);
     parsePcapFile(argv[1]);
     return 0;
 }

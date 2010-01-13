@@ -28,13 +28,18 @@ struct time_information_array
     uint32_t entries;
 };
 
+struct tcp_participant
+{
+    uint32_t address;
+    uint16_t port;
+    uint32_t start_seq;
+    struct growing_array data;
+    struct time_information_array timeinfo;
+};
+
 struct tcp_connection
 {
-    uint32_t from, to;
-    uint16_t src_port, dst_port;
-    uint32_t src_start_seq, dst_start_seq;
+    struct tcp_participant from, to;
     enum tcp_state state;
-    struct growing_array src_data, dst_data;
-    struct time_information_array src_timeinfo, dst_timeinfo;
 };
 
