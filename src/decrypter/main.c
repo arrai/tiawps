@@ -4,8 +4,8 @@
 
 #include "pcapreader.h"
 #include "structs.h"
+#include "decrypt.h"
 
-#define SESSION_KEY_LENGTH  40
 const uint8_t MAGIC_WOW_START[] = {0x00, 0x06, 0xEC, 0x01};
 
 static uint8_t SESSIONKEY[SESSION_KEY_LENGTH];

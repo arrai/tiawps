@@ -1,6 +1,8 @@
 #include <stdint.h>
 #include <netinet/in.h> 
 
+#define SESSION_KEY_LENGTH  40
+
 enum tcp_state
 {
     SYNED,          // SYN has been sent
