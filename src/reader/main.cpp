@@ -5,7 +5,7 @@
 #include <ws2tcpip.h>
 
 
-#define CONNECTION_PTR_OFFSET      0x012705C4
+#define CONNECTION_PTR_OFFSET      0x00C923C0
 #define SESSIONKEY_OFFSET          0x508
 #define VERSION                    "3.2.2"
 #define CONFIG_NAME                "tiawps_reader_config.txt"
