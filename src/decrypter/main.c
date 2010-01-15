@@ -342,6 +342,38 @@ void decrypt()
         struct decryption_state client_state, server_state;
         init_decryption_state_server(&server_state, SESSIONKEY);
         init_decryption_state_client(&client_state, SESSIONKEY);
+
+        uint32_t client_ti_counter=0, server_ti_counter=0;
+        while(client_ti_counter < connection->from.timeinfo.entries ||
+                server_ti_counter < connection->to.timeinfo.entries)
+        {
+            uint64_t nextServerPacketTime, nextClientPacketTime;
+            nextServerPacketTime = server_ti_counter < connection->to.timeinfo.entries?connection->to.timeinfo.info[server_ti_counter].epoch_micro:UINT64_MAX;
+            nextClientPacketTime = client_ti_counter < connection->from.timeinfo.entries?connection->from.timeinfo.info[client_ti_counter].epoch_micro:UINT64_MAX;
+
+            struct decryption_state *nextState;
+            uint32_t ti_counter;
+            struct tcp_participant *participant;
+            if(nextServerPacketTime < nextClientPacketTime)
+            {
+                nextState = &server_state;
+                ti_counter = server_ti_counter;
+                participant = &connection->to;
+            }
+            else
+            {
+                nextState = &client_state;
+                ti_counter = client_ti_counter;
+                participant = &connection->from;
+            }
+            uint8_t *data = &participant->data.buffer[participant->timeinfo.info[ti_counter].sequence];
+            uint32_t datalen;
+            if(ti_counter < participant->timeinfo.entries-1)
+                datalen = participant->timeinfo.info[ti_counter].sequence-participant->timeinfo.info[ti_counter+1].sequence;
+            else
+                datalen = 0; // TODO: what about last packet?
+            update_decryption(nextState, participant->timeinfo.info[ti_counter].epoch_micro, data, datalen, insertPacket);
+        }
     }
 }
 

@@ -20,6 +20,8 @@ void init_decryption_state_client(struct decryption_state *state, uint8_t *sessi
 
 void init_decryption_state(struct decryption_state *state, uint8_t *sessionkey, const uint8_t *seed)
 {
+    state->buffer = NULL;
+    state->bufferSize = 0;
 
     uint8_t rc4_key[HMAC_RESULT_LEN];
     uint32_t len = HMAC_RESULT_LEN;
@@ -34,3 +36,9 @@ void init_decryption_state(struct decryption_state *state, uint8_t *sessionkey, 
         RC4(&state->key, 1, &trash, &trash);
     }
 }
+
+void update_decryption(struct decryption_state *state, uint64_t time, uint8_t *data, uint32_t data_len,
+        void(*callback)(uint8_t s2c, uint64_t time, uint16_t opcode, uint8_t *data, uint32_t data_len))
+{
+}
+
