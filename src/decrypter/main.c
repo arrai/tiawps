@@ -1,10 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "pcapreader.h"
 #include "structs.h"
 #include "decrypt.h"
+#include "sqliteout.h"
 
 const uint8_t MAGIC_WOW_START[] = {0x00, 0x06, 0xEC, 0x01};
 
@@ -211,7 +213,9 @@ void handleTcpPacket(uint32_t from, uint32_t to, uint16_t tcp_len, struct sniff_
                 }
             }
             uint32_t payload_size = tcp_len - tcp_header_size;
+#ifdef DEBUG
             printf("    payload_size : %u\n", payload_size);
+#endif
             if(payload_size)
             {
                 struct tcp_participant *participant;
@@ -278,8 +282,10 @@ void parsePcapFile(const char* filename)
         }
         else
         {
+#ifdef DEBUG
             printf("ip packet len=%u from %s", ntohs(ipframe->ip_len), addrToStr(ntohl(ipframe->ip_src.s_addr)));
             printf(" to %s\n", addrToStr(ntohl(ipframe->ip_dst.s_addr)));
+#endif
             uint32_t size_ip = IP_HL(ipframe)*4;
             if(size_ip<20)
             {
@@ -292,18 +298,51 @@ void parsePcapFile(const char* filename)
             else
             {
                 struct sniff_tcp_t *tcppacket = (struct sniff_tcp_t*)(data+ip_data_offset+size_ip);
+#ifdef DEBUG
                 printf("    th_sport: %u\n", ntohs(tcppacket->th_sport));
                 printf("    th_dport: %u\n", ntohs(tcppacket->th_dport));
+#endif
                 uint64_t micro_epoch = packet.ts_sec;
                 micro_epoch *= 1000000;
                 micro_epoch += packet.ts_usec;
-                handleTcpPacket(ipframe->ip_src.s_addr, ipframe->ip_dst.s_addr, ntohs(ipframe->ip_len)-size_ip, tcppacket, micro_epoch);
+                handleTcpPacket(ntohl(ipframe->ip_src.s_addr), ntohl(ipframe->ip_dst.s_addr), ntohs(ipframe->ip_len)-size_ip, tcppacket, micro_epoch);
             }
         }
         free(data);
     }
-
+    printf("Finished parsing file, tracked %u connection%s\n", connection_count, connection_count==1?"":"s");
+    for(uint32_t i=0; i<connection_count; ++i)
+    {
+        struct tcp_connection *connection = connections[i];
+        printf("Connection %u:\n", i);
+        printf("  From: %s:%u\n", addrToStr(connection->from.address), ntohs(connection->from.port));
+        printf("      Data sent: %u bytes\n", connection->from.data.buffersize);
+        printf("  To: %s:%u\n", addrToStr(connection->to.address), ntohs(connection->to.port));
+        printf("      Data sent: %u bytes\n", connection->to.data.buffersize);
+    }
     free(header);
+}
+
+void decrypt()
+{
+    for(uint32_t i=0; i<connection_count; ++i)
+    {
+        struct tcp_connection *connection = connections[i];
+        if(connection->to.timeinfo.entries <1)
+        {
+            continue;
+        }
+        char filename[28];
+        time_t time = connection->to.timeinfo.info[0].epoch_micro/1000000;
+        struct tm* timestruct = localtime(&time);
+        strftime (filename, sizeof(filename), "%Y_%m_%d__%H_%M_%S.sqlite", timestruct);
+
+        initDatabase(filename);
+
+        struct decryption_state client_state, server_state;
+        init_decryption_state_server(&server_state, SESSIONKEY);
+        init_decryption_state_client(&client_state, SESSIONKEY);
+    }
 }
 
 int main(int argc, char *argv[])
@@ -316,5 +355,6 @@ int main(int argc, char *argv[])
     
     readSessionkeyFile(argv[2]);
     parsePcapFile(argv[1]);
+    decrypt();
     return 0;
 }
