@@ -5,7 +5,7 @@
 #include "structs.h"
 
 #define SEED_KEY_SIZE       16
-#define SHA_DIGEST_LENGTH   32
+#define SHA_DIGEST_LENGTH   20
 
 const uint8_t serverSeed[SEED_KEY_SIZE] = { 0x22, 0xBE, 0xE5, 0xCF, 0xBB, 0x07, 0x64, 0xD9, 0x00, 0x45, 0x1B, 0xD0, 0x24, 0xB8, 0xD5, 0x45 };
 const uint8_t clientSeed[SEED_KEY_SIZE] = { 0xF4, 0x66, 0x31, 0x59, 0xFC, 0x83, 0x6E, 0x31, 0x31, 0x02, 0x51, 0xD5, 0x44, 0x31, 0x67, 0x98 };
@@ -24,7 +24,7 @@ void init_decryption_state(struct decryption_state *this, uint8_t *sessionkey, c
     this->decryptedHeaderBytes = 0;
     this->firstPacket = 1;
 
-    uint8_t m_digest[SHA_DIGEST_LENGTH];
+    uint8_t m_digest[SHA_DIGEST_LENGTH] = {0};
     {
         // constructor
         HMAC_CTX m_ctx;
@@ -37,7 +37,7 @@ void init_decryption_state(struct decryption_state *this, uint8_t *sessionkey, c
         // finalize
         uint32_t length = 0;
         HMAC_Final(&m_ctx, m_digest, &length);
-        if(length == SHA_DIGEST_LENGTH)
+        if(length != SHA_DIGEST_LENGTH)
         {
             printf("%u = length != SHA_DIGEST_LENGTH = %u\n", length, SHA_DIGEST_LENGTH);
             exit(1);
@@ -45,6 +45,10 @@ void init_decryption_state(struct decryption_state *this, uint8_t *sessionkey, c
         HMAC_CTX_cleanup(&m_ctx);
     }
 
+    printf("m_digest: ");
+    for(int i=0; i<SHA_DIGEST_LENGTH; ++i)
+        printf("%02X ", m_digest[i]);
+    printf("\n");
     // constructor
     EVP_CIPHER_CTX_init(&this->key);
     EVP_EncryptInit_ex(&this->key, EVP_rc4(), NULL, NULL, NULL);
@@ -54,11 +58,15 @@ void init_decryption_state(struct decryption_state *this, uint8_t *sessionkey, c
     EVP_EncryptInit_ex(&this->key, NULL, NULL, m_digest, NULL);
 
     // drop first 1024 bytes
+    printf("\nsyncbuffer!\n");
     uint8_t trash;
     for(uint16_t i=0; i<1024; ++i)
     {
+        trash = 0;
         decryptData(1, &trash, this);
+        printf("%02X ", trash);
     }
+    printf("\n");
 }
 
 void init_decryption_state_server(struct decryption_state *this, uint8_t *sessionkey)

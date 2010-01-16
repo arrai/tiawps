@@ -59,7 +59,7 @@ void readSessionkeyFile(const char* file)
                     printf("read sessionkey: ");
                     for(uint32_t i=0; i<SESSION_KEY_LENGTH; ++i)
                     {
-                        printf("%X ", SESSIONKEY[i]);
+                        printf("%02X ", SESSIONKEY[i]);
                     }
                     printf("\n\n");
                     fclose(fp);

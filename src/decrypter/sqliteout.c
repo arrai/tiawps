@@ -9,6 +9,7 @@ static sqlite3 *db;
 
 void initDatabase(const char* filename)
 {
+    db = NULL;
     int rc = sqlite3_open(filename, &db);
     if( rc ){
         fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
