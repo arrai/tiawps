@@ -2,13 +2,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <ctype.h>
 
 #include "pcapreader.h"
 #include "structs.h"
 #include "decrypt.h"
 #include "sqliteout.h"
 
-const uint8_t MAGIC_WOW_START[] = {0x00, 0x06, 0xEC, 0x01};
+const uint8_t MAGIC_WOW_START[] = {0x00, 0x1A, 0xEC, 0x01};
 
 static uint8_t SESSIONKEY[SESSION_KEY_LENGTH];
 
@@ -20,12 +21,46 @@ void readSessionkeyFile(const char* file)
         printf("Couldn't open keyfile %s\n", file);
         exit(1);
     }
-    const int expectedBytes = sizeof(SESSIONKEY);
-    int readCount = fread(SESSIONKEY, 1, expectedBytes, fp);
-    if(readCount != expectedBytes)
+
+    char buffer[1024];
+    uint32_t sessionKeyIdx = 0;
+    uint8_t startedNibble =0x0F;
+    while(1)
     {
-        printf("Couldn't read %u bytes from keyfile %s\n", expectedBytes, file);
-        exit(1);
+        uint32_t readCount = fread(buffer, 1, sizeof(buffer), fp);
+        if(!readCount)
+        {
+            printf("Couldn't read sessionkey from keyfile %s, got only %u of %u keybytes\n", file, sessionKeyIdx, SESSION_KEY_LENGTH);
+            exit(1);
+        }
+        for(uint32_t i=0; i<readCount; ++i)
+        {
+            char c = tolower(buffer[i]);
+            uint8_t value = 0;
+            if(c >='0' && c <= '9')
+            {
+                value = c-'0';
+            }
+            else if(c>='a' && c<='f')
+            {
+                value = c-'a'+0xa;
+            }
+            else
+                continue;
+            if(startedNibble == 0x0F)
+                startedNibble = value<<4;
+            else
+            {
+                SESSIONKEY[sessionKeyIdx] = startedNibble | value;
+                startedNibble = 0x0F;
+                sessionKeyIdx++;
+                if(sessionKeyIdx == SESSION_KEY_LENGTH)
+                {
+                    fclose(fp);
+                    return;
+                }
+            }
+        }
     }
     fclose(fp);
 }
@@ -113,10 +148,25 @@ static struct tcp_connection **connections = NULL;
 static uint32_t connection_count = 0;
 void removeConnection(struct tcp_connection *connection)
 {
-    // TODO: implement me
-    connection->state = SYNED;
-    printf("called unimplemented function removeConnection. bye.\n");
-    exit(1);
+    // remove pointer from connections
+    uint8_t foundConnection = 0;
+    for(uint32_t i=0; i<connection_count; ++i)
+    {
+        if(connections[i] == connection)
+        {
+            foundConnection = 1;
+            memmove(&connections[i], &connections[i+1], sizeof(struct tcp_connection*)*(connection_count-i-1));
+            connection_count--;
+            connections = realloc(connections, sizeof(struct tcp_connection*)*connection_count);
+            free(connection);
+            break;
+        }
+    }
+    if(!foundConnection)
+    {
+        printf("removeConnection: connection could not be found\n");
+        exit(1);
+    }
 }
 
 void handleTcpPacket(uint32_t from, uint32_t to, uint16_t tcp_len, struct sniff_tcp_t *tcppacket, uint64_t epoch_micro_secs)
@@ -153,10 +203,10 @@ void handleTcpPacket(uint32_t from, uint32_t to, uint16_t tcp_len, struct sniff_
 
             connection->state = SYNED;
 
-            connection->to.data.buffer= NULL;
+            connection->from.data.buffer= NULL;
             connection->from.data.buffersize= 0;
             connection->to.data.buffer= NULL;
-            connection->from.data.buffersize= 0;
+            connection->to.data.buffersize= 0;
 
             connection->from.timeinfo.info = NULL;
             connection->from.timeinfo.entries= 0;
@@ -357,13 +407,13 @@ void decrypt()
             if(nextServerPacketTime < nextClientPacketTime)
             {
                 nextState = &server_state;
-                ti_counter = server_ti_counter;
+                ti_counter = server_ti_counter++;
                 participant = &connection->to;
             }
             else
             {
                 nextState = &client_state;
-                ti_counter = client_ti_counter;
+                ti_counter = client_ti_counter++;
                 participant = &connection->from;
             }
             uint8_t *data = &participant->data.buffer[participant->timeinfo.info[ti_counter].sequence];
