@@ -1,11 +1,24 @@
 #include "tools.h"
 
+char encodeNibble(uint8_t nibble)
+{
+    if(nibble<=9)
+        return '0'+nibble;
+    else
+        return 'A'+nibble-10;
+}
+
 const char* hexEncode(const uint8_t *data, const uint32_t data_len)
 {
     static char* buffer = NULL;
 
     buffer=realloc(buffer, data_len*2+1);
 
+    if(buffer == NULL)
+    {
+        printf("hexEncode: failed to allocate %u bytes\n", data_len);
+        exit(1);
+    }
     buffer[data_len*2] = '\0';
     for(uint32_t i=0; i<data_len; ++i)
     {
@@ -14,5 +27,17 @@ const char* hexEncode(const uint8_t *data, const uint32_t data_len)
         buffer[i*2+1] = encodeNibble(0x0F&byte);
     }
     return buffer;
+}
+
+void strInverse(char* str, uint32_t len)
+{
+    uint32_t half = len/2;
+    char buf;
+    for(uint32_t i=0; i<half; ++i)
+    {
+        buf = str[i];
+        str[i] = str[len-i-1];
+        str[len-i-1] = buf;
+    }
 }
 

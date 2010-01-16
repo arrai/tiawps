@@ -27,14 +27,6 @@ void initDatabase(const char* filename)
 
 }
 
-char encodeNibble(uint8_t nibble)
-{
-    if(nibble<=9)
-        return '0'+nibble;
-    else
-        return 'A'+nibble-10;
-}
-
 void insertPacket(uint8_t s2c, uint64_t time, uint16_t opcode, uint8_t *data, uint32_t data_len)
 {
     printf("insertpacket called\n");

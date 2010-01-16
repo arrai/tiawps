@@ -56,6 +56,12 @@ void readSessionkeyFile(const char* file)
                 sessionKeyIdx++;
                 if(sessionKeyIdx == SESSION_KEY_LENGTH)
                 {
+                    printf("read sessionkey: ");
+                    for(uint32_t i=0; i<SESSION_KEY_LENGTH; ++i)
+                    {
+                        printf("%X ", SESSIONKEY[i]);
+                    }
+                    printf("\n\n");
                     fclose(fp);
                     return;
                 }
@@ -365,7 +371,7 @@ void parsePcapFile(const char* filename)
 
 void dumpConnections()
 {
-    printf("Finished parsing file, tracked %u connection%s\n", connection_count, connection_count==1?"":"s");
+    printf("Finished parsing file, filtered %u connection%s\n", connection_count, connection_count==1?"":"s");
     for(uint32_t i=0; i<connection_count; ++i)
     {
         struct tcp_connection *connection = connections[i];
