@@ -5,6 +5,11 @@ struct decryption_state
 {
     uint8_t *buffer;
     uint32_t bufferSize;
+
+    uint8_t firstPacket;
+
+    uint8_t decryptedHeaderBytes;
+    uint8_t s2c;
     RC4_KEY key;
 };
 

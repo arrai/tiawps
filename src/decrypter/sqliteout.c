@@ -37,6 +37,7 @@ char encodeNibble(uint8_t nibble)
 
 void insertPacket(uint8_t s2c, uint64_t time, uint16_t opcode, uint8_t *data, uint32_t data_len)
 {
+    printf("insertpacket called\n");
     const char* insertFormat = "insert into packets (timestamp, direction, opcode, data) "
         "values (datetime(%u,'unixepoch'), %u, %u, X'%s');";
 

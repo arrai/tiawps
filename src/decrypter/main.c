@@ -360,6 +360,11 @@ void parsePcapFile(const char* filename)
         }
         free(data);
     }
+    free(header);
+}
+
+void dumpConnections()
+{
     printf("Finished parsing file, tracked %u connection%s\n", connection_count, connection_count==1?"":"s");
     for(uint32_t i=0; i<connection_count; ++i)
     {
@@ -370,7 +375,20 @@ void parsePcapFile(const char* filename)
         printf("  To: %s:%u\n", addrToStr(connection->to.address), ntohs(connection->to.port));
         printf("      Data sent: %u bytes\n", connection->to.data.buffersize);
     }
-    free(header);
+}
+
+void removeInvalidConnections()
+{
+    printf("Removing invalid connections\n");
+    for(uint32_t i=0; i<connection_count; ++i)
+    {
+        struct tcp_connection *connection = connections[i];
+        if(connection->state != ACTIVE)
+        {
+            removeConnection(connection);
+            i=0;
+        }
+    }
 }
 
 void decrypt()
@@ -419,7 +437,9 @@ void decrypt()
             uint8_t *data = &participant->data.buffer[participant->timeinfo.info[ti_counter].sequence];
             uint32_t datalen;
             if(ti_counter < participant->timeinfo.entries-1)
-                datalen = participant->timeinfo.info[ti_counter].sequence-participant->timeinfo.info[ti_counter+1].sequence;
+            {
+                datalen = participant->timeinfo.info[ti_counter+1].sequence-participant->timeinfo.info[ti_counter].sequence;
+            }
             else
                 datalen = 0; // TODO: what about last packet?
             update_decryption(nextState, participant->timeinfo.info[ti_counter].epoch_micro, data, datalen, insertPacket);
@@ -437,6 +457,8 @@ int main(int argc, char *argv[])
     
     readSessionkeyFile(argv[2]);
     parsePcapFile(argv[1]);
+    removeInvalidConnections();
+    dumpConnections();
     decrypt();
     return 0;
 }
