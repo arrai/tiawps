@@ -48,6 +48,7 @@ void insertPacket(uint8_t s2c, uint64_t time, uint16_t opcode, uint8_t *data, ui
     char *errMsg = 0;
     int rc = sqlite3_exec(db, queryBuffer, NULL, 0, &errMsg);
 
+    free(queryBuffer);
     if( rc!=SQLITE_OK ){
         printf("SQL error: %s\n", errMsg);
         sqlite3_free(errMsg);

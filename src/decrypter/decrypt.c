@@ -17,6 +17,12 @@ void decryptData(int len, uint8_t *data, struct decryption_state *this)
     EVP_EncryptFinal_ex(&this->key, data, &outlen);
 }
 
+void free_decryption_state(struct decryption_state *this)
+{
+    EVP_CIPHER_CTX_cleanup(&this->key);
+    free(this->buffer);
+}
+
 void init_decryption_state(struct decryption_state *this, uint8_t *sessionkey, const uint8_t *seed)
 {
     this->buffer = NULL;

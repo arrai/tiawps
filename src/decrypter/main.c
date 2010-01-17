@@ -444,12 +444,16 @@ void decrypt()
             uint32_t datalen;
             if(ti_counter < participant->timeinfo.entries-1)
             {
-                datalen = participant->timeinfo.info[ti_counter+1].sequence-participant->timeinfo.info[ti_counter].sequence;
+                datalen = participant->timeinfo.info[ti_counter+1].sequence - participant->timeinfo.info[ti_counter].sequence;
             }
             else
-                datalen = 0; // TODO: what about last packet?
+            {
+                datalen = participant->data.buffersize - participant->timeinfo.info[ti_counter].sequence;
+            }
             update_decryption(nextState, participant->timeinfo.info[ti_counter].epoch_micro, data, datalen, insertPacket);
         }
+        free_decryption_state(&server_state);
+        free_decryption_state(&client_state);
     }
 }
 
