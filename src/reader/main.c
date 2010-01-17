@@ -1,5 +1,6 @@
 #include <windows.h>
 #include <stdio.h>
+#include <time.h>
 
 #define CONNECTION_PTR_OFFSET      0x00C923C0
 #define SESSIONKEY_OFFSET          0x508
@@ -12,19 +13,50 @@ void dumpByteArray(char* array, int size)
         printf("%02X ", (unsigned char)array[i]);
 }
 
+_Bool writeToFile(char* sessionKey)
+{
+    char filename[32];
+    time_t rawtime;
+    time(&rawtime);
+    struct tm* timestruct = localtime(&rawtime);
+    strftime (filename, sizeof(filename), "KEY_%Y_%m_%d__%H_%M_%S.txt", timestruct);
+
+    FILE *fp = fopen(filename, "w");
+    if(!fp)
+    {
+        printf("couldn't open  file %s for writing\n", filename);
+        return FALSE;
+    }
+
+    char hexBuf[4];
+    for(int i=0; i<SESSIONKEY_LENGTH; ++i)
+    {
+        sprintf(hexBuf, "%02X ", 0x000000FF&sessionKey[i]);
+        if(!fwrite(hexBuf, 3, 1, fp))
+        {
+            printf("couldn't write to %s\n", filename);
+            fclose(fp);
+            return FALSE;
+        }
+    }
+    fclose(fp);
+    printf("wrote sessionkey to %s\n", filename);
+    return TRUE;
+}
+
 _Bool readSessionKey(char* sessionKey)
 {
     HANDLE hToken;
     OpenProcessToken( GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken );
 
-    TOKEN_PRIVILEGES tp = { 0 }; 
-    LUID luid; 
-    DWORD cb = sizeof(TOKEN_PRIVILEGES); 
+    TOKEN_PRIVILEGES tp = { 0 };
+    LUID luid;
+    DWORD cb = sizeof(TOKEN_PRIVILEGES);
     if( !LookupPrivilegeValue( NULL, SE_DEBUG_NAME, &luid ) )
         return FALSE;
 
-    tp.PrivilegeCount = 1; 
-    tp.Privileges[0].Luid = luid; 
+    tp.PrivilegeCount = 1;
+    tp.Privileges[0].Luid = luid;
     tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
 
     AdjustTokenPrivileges( hToken, FALSE, &tp, cb, NULL, NULL );
@@ -47,7 +79,7 @@ _Bool readSessionKey(char* sessionKey)
     DWORD number_of_read_bytes=0;
 
     char pointer[4] = {'\0'};
-    ReadProcessMemory(wow_process_handle, (LPCVOID)CONNECTION_PTR_OFFSET, pointer, 4, &number_of_read_bytes); 
+    ReadProcessMemory(wow_process_handle, (LPCVOID)CONNECTION_PTR_OFFSET, pointer, 4, &number_of_read_bytes);
 
     if(number_of_read_bytes != 4)
     {
@@ -84,13 +116,13 @@ _Bool readSessionKey(char* sessionKey)
         return FALSE;
     }
 
-    return TRUE;
+    return writeToFile(sessionKey);
 }
 
 int main()
 {
     printf("Tiawps sessionkey reader for version %s started\n", VERSION);
-    
+
     char sessionKey[SESSIONKEY_LENGTH] = {'\0'};
 
     while(!readSessionKey(sessionKey))
@@ -98,8 +130,6 @@ int main()
         printf("reading sessionkey failed - will try again in 1 second\n");
         Sleep(1000);
     }
-
-    printf("trying to send it to tiawps dumper\n");
 
     return 0;
 }

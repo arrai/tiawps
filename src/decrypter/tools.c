@@ -29,15 +29,3 @@ const char* hexEncode(const uint8_t *data, const uint32_t data_len)
     return buffer;
 }
 
-void strInverse(char* str, uint32_t len)
-{
-    uint32_t half = len/2;
-    char buf;
-    for(uint32_t i=0; i<half; ++i)
-    {
-        buf = str[i];
-        str[i] = str[len-i-1];
-        str[len-i-1] = buf;
-    }
-}
-

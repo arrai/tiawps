@@ -9,6 +9,8 @@
 #include "decrypt.h"
 #include "sqliteout.h"
 
+#define DEBUG               0
+
 const uint8_t MAGIC_WOW_START[] = {0x00, 0x1A, 0xEC, 0x01};
 
 static uint8_t SESSIONKEY[SESSION_KEY_LENGTH];
@@ -107,26 +109,6 @@ void addTimeInfo(struct time_information_array *info_array, uint32_t seq, uint64
     info_array->info[info_array->entries-1].epoch_micro = epoch_micro_secs;
 }
 
-void dumpTimeInfo(struct time_information_array *array)
-{
-    for(uint32_t i=0; i<array->entries; ++i)
-    {
-        printf("        info[%u].seq = %u\n", i, array->info[i].sequence);
-    }
-}
-
-void dumpDataInfo(struct growing_array *array)
-{
-    FILE *file = fopen("data.out", "w");
-    if(!file)
-    {
-        printf("fopen failed\n");
-        return;
-    }
-    fwrite(array->buffer, 1, array->buffersize, file);
-    fclose(file);
-}
-
 void addPayload(struct growing_array *array, uint32_t arrayIndex, uint8_t *payload, uint16_t payload_size)
 {
     if(array->buffersize < arrayIndex+payload_size)
@@ -135,9 +117,6 @@ void addPayload(struct growing_array *array, uint32_t arrayIndex, uint8_t *paylo
         array->buffer = realloc(array->buffer, array->buffersize);
     }
     memcpy(array->buffer+arrayIndex, payload, payload_size);
-#ifdef DEBUG
-    dumpDataInfo(array);
-#endif
 }
 
 void registerTcpPayload(struct tcp_participant *participant, uint64_t epoch_micro_secs, uint16_t payload_size, uint8_t *payload, uint32_t seq)
@@ -145,9 +124,6 @@ void registerTcpPayload(struct tcp_participant *participant, uint64_t epoch_micr
     uint32_t arrayIndex = seq-(participant->start_seq+1);
     addTimeInfo(&participant->timeinfo, arrayIndex, epoch_micro_secs);
     addPayload(&participant->data, arrayIndex, payload, payload_size);
-#ifdef DEBUG
-    dumpTimeInfo(&participant->timeinfo);
-#endif
 }
 
 static struct tcp_connection **connections = NULL;
@@ -269,9 +245,8 @@ void handleTcpPacket(uint32_t from, uint32_t to, uint16_t tcp_len, struct sniff_
                 }
             }
             uint32_t payload_size = tcp_len - tcp_header_size;
-#ifdef DEBUG
-            printf("    payload_size : %u\n", payload_size);
-#endif
+            if(DEBUG)
+                printf("    payload_size : %u\n", payload_size);
             if(payload_size)
             {
                 struct tcp_participant *participant;
@@ -338,10 +313,11 @@ void parsePcapFile(const char* filename)
         }
         else
         {
-#ifdef DEBUG
-            printf("ip packet len=%u from %s", ntohs(ipframe->ip_len), addrToStr(ntohl(ipframe->ip_src.s_addr)));
-            printf(" to %s\n", addrToStr(ntohl(ipframe->ip_dst.s_addr)));
-#endif
+            if(DEBUG)
+            {
+                printf("ip packet len=%u from %s", ntohs(ipframe->ip_len), addrToStr(ntohl(ipframe->ip_src.s_addr)));
+                printf(" to %s\n", addrToStr(ntohl(ipframe->ip_dst.s_addr)));
+            }
             uint32_t size_ip = IP_HL(ipframe)*4;
             if(size_ip<20)
             {
@@ -354,10 +330,11 @@ void parsePcapFile(const char* filename)
             else
             {
                 struct sniff_tcp_t *tcppacket = (struct sniff_tcp_t*)(data+ip_data_offset+size_ip);
-#ifdef DEBUG
-                printf("    th_sport: %u\n", ntohs(tcppacket->th_sport));
-                printf("    th_dport: %u\n", ntohs(tcppacket->th_dport));
-#endif
+                if(DEBUG)
+                {
+                    printf("    th_sport: %u\n", ntohs(tcppacket->th_sport));
+                    printf("    th_dport: %u\n", ntohs(tcppacket->th_dport));
+                }
                 uint64_t micro_epoch = packet.ts_sec;
                 micro_epoch *= 1000000;
                 micro_epoch += packet.ts_usec;
