@@ -28,7 +28,7 @@ void init_decryption_state(struct decryption_state *this, uint8_t *sessionkey, c
     this->buffer = NULL;
     this->bufferSize = 0;
     this->decryptedHeaderBytes = 0;
-    this->firstPacket = 1;
+    this->skipDecryptCount = 1;
 
     uint8_t m_digest[SHA_DIGEST_LENGTH] = {0};
     {
@@ -64,31 +64,29 @@ void init_decryption_state(struct decryption_state *this, uint8_t *sessionkey, c
     EVP_EncryptInit_ex(&this->key, NULL, NULL, m_digest, NULL);
 
     // drop first 1024 bytes
-    printf("\nsyncbuffer!\n");
     uint8_t trash;
     for(uint16_t i=0; i<1024; ++i)
     {
-        trash = 0;
         decryptData(1, &trash, this);
-        printf("%02X ", trash);
     }
-    printf("\n");
 }
 
 void init_decryption_state_server(struct decryption_state *this, uint8_t *sessionkey)
 {
     this->s2c = 1;
+    this->opcodeLen = 2;
     init_decryption_state(this, sessionkey, serverSeed);
 }
 
 void init_decryption_state_client(struct decryption_state *this, uint8_t *sessionkey)
 {
     this->s2c = 0;
+    this->opcodeLen = 4;
     init_decryption_state(this, sessionkey, clientSeed);
 }
 
-void update_decryption(struct decryption_state *this, uint64_t time, uint8_t *data, uint32_t data_len, void *arg,
-        void(*callback)(uint8_t s2c, uint64_t time, uint16_t opcode, uint8_t *data, uint32_t data_len, void *arg))
+void update_decryption(struct decryption_state *this, uint64_t time, uint8_t *data, uint32_t data_len, void *db,
+        void(*callback)(uint8_t s2c, uint64_t time, uint16_t opcode, uint8_t *data, uint32_t data_len, void *db))
 {
     if(data_len == 0)
         return;
@@ -102,64 +100,71 @@ void update_decryption(struct decryption_state *this, uint64_t time, uint8_t *da
     memcpy(this->buffer+this->bufferSize, data, data_len);
     this->bufferSize += data_len;
 
-    if(this->bufferSize < 4)
+    if(this->bufferSize < this->opcodeLen+2)
         return;
 
-    if(this->firstPacket)
+    if(this->skipDecryptCount)
     {
-        this->firstPacket = 0;
-        this->decryptedHeaderBytes = 4;
+        this->skipDecryptCount--;
+        this->decryptedHeaderBytes = this->opcodeLen+2;
     }
 
     if(this->decryptedHeaderBytes == 0)
     {
-        decryptData(4, this->buffer, this);
-        this->decryptedHeaderBytes = 4;
+        decryptData(this->opcodeLen+2, this->buffer, this);
+        this->decryptedHeaderBytes = this->opcodeLen+2;
     }
-    if(this->decryptedHeaderBytes == 4)
+    if(this->decryptedHeaderBytes == this->opcodeLen+2)
     {
         // large packet
         if(this->buffer[0]&0x80)
         {
             printf("Large packet detected\n");
-            if(this->bufferSize < 5)
+            if(this->bufferSize < this->opcodeLen+3)
                 return;
-            decryptData(1, this->buffer+4, this);
-            this->decryptedHeaderBytes = 5;
+            decryptData(1, this->buffer+this->opcodeLen+2, this);
+            this->decryptedHeaderBytes = this->opcodeLen+3;
         }
     }
     uint8_t i=0;
-    uint16_t opcode = 0;
+    uint32_t opcode = 0;
     uint32_t payloadLen = 0;
 
-    if(this->decryptedHeaderBytes == 5)
+    if(this->decryptedHeaderBytes == this->opcodeLen+3)
         payloadLen = this->buffer[i++]&0x7F;
     payloadLen = (payloadLen<<8)|this->buffer[i++];
     payloadLen = (payloadLen<<8)|this->buffer[i++];
 
-    if(payloadLen <= 2)
+    if(payloadLen < this->opcodeLen)
     {
-        printf("FATAL: got a packet with payloadLen=%u which is <= 2\n", payloadLen);
+        printf("FATAL: got a packet with payloadLen=%u which is < %u = opcodeLen\n", payloadLen, this->opcodeLen);
         exit(1);
     }
 
-    opcode = this->buffer[i++];
-    opcode = (this->buffer[i++]<<8) | opcode;
-
-    printf("payload: %u, opcode: 0x%x\n", payloadLen-2, opcode);
-
-    if(this->bufferSize+2-this->decryptedHeaderBytes >= payloadLen)
+    for(uint8_t j=0; j< this->opcodeLen; j++)
     {
-        callback(this->s2c, time, opcode, this->buffer+this->decryptedHeaderBytes, payloadLen-2, arg);
+        opcode |= (this->buffer[i++]<<(8*j));
+    }
 
-        uint32_t remainingBufferSize = this->bufferSize-this->decryptedHeaderBytes-(payloadLen-2);
-        memmove(this->buffer, this->buffer+this->decryptedHeaderBytes+(payloadLen-2), remainingBufferSize);
+
+    printf("%u, buffersize = %u, len= %u\n", this->s2c, this->bufferSize, payloadLen);
+    if(this->bufferSize+this->opcodeLen-this->decryptedHeaderBytes >= payloadLen)
+    {
+        callback(this->s2c, time, opcode, this->buffer+this->decryptedHeaderBytes, payloadLen-this->opcodeLen, db);
+
+        uint32_t remainingBufferSize = this->bufferSize - this->decryptedHeaderBytes-(payloadLen-this->opcodeLen);
+        memmove(this->buffer, this->buffer+this->decryptedHeaderBytes+(payloadLen-this->opcodeLen), remainingBufferSize);
         this->buffer = realloc(this->buffer, remainingBufferSize);
         this->bufferSize = remainingBufferSize;
         this->decryptedHeaderBytes = 0;
-        printf("bufferSize at end: %u\n", this->bufferSize);
-        if(this->bufferSize)
-            printf("update_decryption at end: data=0x%02X...0x%02X\n", this->buffer[0], this->buffer[this->bufferSize-1]);
+        if(0)
+        {
+            printf("bufferSize at end: %u\n", this->bufferSize);
+            if(this->bufferSize)
+                printf("update_decryption at end: data=0x%02X...0x%02X\n", this->buffer[0], this->buffer[this->bufferSize-1]);
+            else
+                printf("update_decryption at end is empty\n");
+        }
     }
 }
 
