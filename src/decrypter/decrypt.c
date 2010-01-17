@@ -107,7 +107,7 @@ void update_decryption(struct decryption_state *this, uint64_t time, uint8_t *da
 
     if(this->decryptedHeaderBytes == 0)
     {
-        decryptData(4, data, this);
+        decryptData(4, this->buffer, this);
         this->decryptedHeaderBytes = 4;
     }
     if(this->decryptedHeaderBytes == 4)
@@ -118,7 +118,7 @@ void update_decryption(struct decryption_state *this, uint64_t time, uint8_t *da
             printf("Large packet detected\n");
             if(this->bufferSize < 5)
                 return;
-            decryptData(1, data+4, this);
+            decryptData(1, this->buffer+4, this);
             this->decryptedHeaderBytes = 5;
         }
     }
