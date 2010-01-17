@@ -87,8 +87,8 @@ void init_decryption_state_client(struct decryption_state *this, uint8_t *sessio
     init_decryption_state(this, sessionkey, clientSeed);
 }
 
-void update_decryption(struct decryption_state *this, uint64_t time, uint8_t *data, uint32_t data_len,
-        void(*callback)(uint8_t s2c, uint64_t time, uint16_t opcode, uint8_t *data, uint32_t data_len))
+void update_decryption(struct decryption_state *this, uint64_t time, uint8_t *data, uint32_t data_len, void *arg,
+        void(*callback)(uint8_t s2c, uint64_t time, uint16_t opcode, uint8_t *data, uint32_t data_len, void *arg))
 {
     if(data_len == 0)
         return;
@@ -150,7 +150,7 @@ void update_decryption(struct decryption_state *this, uint64_t time, uint8_t *da
 
     if(this->bufferSize+2-this->decryptedHeaderBytes >= payloadLen)
     {
-        callback(this->s2c, time, opcode, this->buffer+this->decryptedHeaderBytes, payloadLen-2);
+        callback(this->s2c, time, opcode, this->buffer+this->decryptedHeaderBytes, payloadLen-2, arg);
 
         uint32_t remainingBufferSize = this->bufferSize-this->decryptedHeaderBytes-(payloadLen-2);
         memmove(this->buffer, this->buffer+this->decryptedHeaderBytes+(payloadLen-2), remainingBufferSize);

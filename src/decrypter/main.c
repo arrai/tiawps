@@ -3,6 +3,7 @@
 #include <string.h>
 #include <time.h>
 #include <ctype.h>
+#include <sqlite3.h>
 
 #include "pcapreader.h"
 #include "structs.h"
@@ -388,7 +389,8 @@ void decrypt()
         struct tm* timestruct = localtime(&time);
         strftime (filename, sizeof(filename), "%Y_%m_%d__%H_%M_%S.sqlite", timestruct);
 
-        initDatabase(filename);
+        sqlite3 *db=NULL;
+        initDatabase(filename, &db);
 
         struct decryption_state client_state, server_state;
         init_decryption_state_server(&server_state, SESSIONKEY);
@@ -427,8 +429,10 @@ void decrypt()
             {
                 datalen = participant->data.buffersize - participant->timeinfo.info[ti_counter].sequence;
             }
-            update_decryption(nextState, participant->timeinfo.info[ti_counter].epoch_micro, data, datalen, insertPacket);
+            update_decryption(nextState, participant->timeinfo.info[ti_counter].epoch_micro, data, datalen, db, insertPacket);
         }
+        freeDatabase(&db);
+
         free_decryption_state(&server_state);
         free_decryption_state(&client_state);
     }
