@@ -83,6 +83,7 @@ const char* addrToStr(int addr)
 
 void addTimeInfo(struct time_information_array *info_array, uint32_t seq, uint64_t epoch_micro_secs)
 {
+    // TODO: implement binary search
     for(uint32_t i=0; i<info_array->entries; ++i)
     {
         if(info_array->info[i].sequence > seq)

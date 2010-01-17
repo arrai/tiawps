@@ -15,7 +15,14 @@ void initDatabase(const char* filename, sqlite3 **db)
     }
     printf("opened database %s\n",filename);
     char *errMsg = 0;
-    rc = sqlite3_exec(*db, "create table packets (id integer primary key autoincrement, timestamp datetime, direction integer, opcode integer, data blob);\n", NULL, 0, &errMsg);
+    rc = sqlite3_exec(*db, "create table packets (id integer primary key autoincrement, timestamp datetime, direction integer, opcode integer, data blob);", NULL, 0, &errMsg);
+
+    if( rc!=SQLITE_OK ){
+        printf("SQL error: %s\n", errMsg);
+        sqlite3_free(errMsg);
+        exit(1);
+    }
+    rc = sqlite3_exec(*db, "BEGIN;", NULL, 0, &errMsg);
 
     if( rc!=SQLITE_OK ){
         printf("SQL error: %s\n", errMsg);
@@ -27,6 +34,14 @@ void initDatabase(const char* filename, sqlite3 **db)
 
 void freeDatabase(sqlite3 **db)
 {
+    char *errMsg = 0;
+    int rc = sqlite3_exec(*db, "COMMIT;", NULL, 0, &errMsg);
+
+    if( rc!=SQLITE_OK ){
+        printf("SQL error: %s\n", errMsg);
+        sqlite3_free(errMsg);
+        exit(1);
+    }
     sqlite3_close(*db);
 }
 
