@@ -265,7 +265,7 @@ void handleTcpPacket(uint32_t from, uint32_t to, uint16_t tcp_len, struct sniff_
 
 void parsePcapFile(const char* filename)
 {
-    FILE *fd = fopen(filename, "r");
+    FILE *fd = fopen(filename, "rb");
     if(!fd)
     {
         printf("Couldn't open pcap file %s\n", filename);
