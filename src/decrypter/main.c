@@ -232,10 +232,11 @@ void handleTcpPacket(uint32_t from, uint32_t to, uint16_t tcp_len, struct sniff_
             uint8_t tcp_header_size = TH_OFF(tcppacket)*4;
             uint8_t *payload = (uint8_t*)tcppacket;
             payload += tcp_header_size;
+            uint32_t payload_size = tcp_len - tcp_header_size;
             if(connection->state != ACTIVE)
             {
                 // check if we got the wow magic bytes
-                if(memcmp(payload, MAGIC_WOW_START, sizeof(MAGIC_WOW_START))==0)
+                if(payload_size >= sizeof(MAGIC_WOW_START) && memcmp(payload, MAGIC_WOW_START, sizeof(MAGIC_WOW_START))==0)
                 {
                     connection->state = ACTIVE;
                     printf("connection changed state: ACTIVE\n");
@@ -246,7 +247,6 @@ void handleTcpPacket(uint32_t from, uint32_t to, uint16_t tcp_len, struct sniff_
                     return;
                 }
             }
-            uint32_t payload_size = tcp_len - tcp_header_size;
             if(DEBUG)
                 printf("    payload_size : %u\n", payload_size);
             if(payload_size)
