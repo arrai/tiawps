@@ -91,9 +91,9 @@ void addTimeInfo(struct time_information_array *info_array, uint32_t seq, uint64
             info_array->entries++;
             info_array->info = realloc(info_array->info, info_array->entries*sizeof(struct time_information));
 
-            memmove(info_array->info+(i+1)*sizeof(struct time_information),
-                    info_array->info+i*sizeof(struct time_information),
-                    sizeof(struct time_information)*(info_array->entries-i));
+            memmove(&info_array->info[i+1],
+                    &info_array->info[i],
+                    sizeof(struct time_information)*(info_array->entries-i-1));
             info_array->info[i].sequence = seq;
             info_array->info[i].epoch_micro = epoch_micro_secs;
             return;
