@@ -83,19 +83,23 @@ const char* addrToStr(int addr)
 
 void addTimeInfo(struct time_information_array *info_array, uint32_t seq, uint64_t epoch_micro_secs)
 {
-    // TODO: implement binary search
-    for(uint32_t i=0; i<info_array->entries; ++i)
+    for(int32_t i=info_array->entries-1; i>=0; --i)
     {
-        if(info_array->info[i].sequence > seq)
+        if(info_array->info[i].sequence < seq)
         {
+            if(i == info_array->entries-1)
+            {
+                // append to end of list
+                break;
+            }
             info_array->entries++;
             info_array->info = realloc(info_array->info, info_array->entries*sizeof(struct time_information));
 
-            memmove(&info_array->info[i+1],
-                    &info_array->info[i],
-                    sizeof(struct time_information)*(info_array->entries-i-1));
-            info_array->info[i].sequence = seq;
-            info_array->info[i].epoch_micro = epoch_micro_secs;
+            memmove(&info_array->info[i+2],
+                    &info_array->info[i+1],
+                    sizeof(struct time_information)*(info_array->entries-(i+1)-1));
+            info_array->info[i+1].sequence = seq;
+            info_array->info[i+1].epoch_micro = epoch_micro_secs;
             return;
         }
         else if(info_array->info[i].sequence == seq)
