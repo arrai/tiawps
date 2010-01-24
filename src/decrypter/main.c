@@ -440,6 +440,7 @@ void decrypt()
 
         free_decryption_state(&server_state);
         free_decryption_state(&client_state);
+        printf("Finished decrypting %u of %u connections\n", i, connection_count);
     }
 }
 
