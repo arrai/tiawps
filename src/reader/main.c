@@ -2,9 +2,9 @@
 #include <stdio.h>
 #include <time.h>
 
-#define CONNECTION_PTR_OFFSET      0x00C923C0
-#define SESSIONKEY_OFFSET          0x508
-#define VERSION                    "Build 11159 3.3.x"
+int CONNECTION_PTR_OFFSET;
+int SESSIONKEY_OFFSET;
+
 #define SESSIONKEY_LENGTH          40
 
 void dumpByteArray(char* array, int size)
@@ -119,9 +119,16 @@ _Bool readSessionKey(char* sessionKey)
     return writeToFile(sessionKey);
 }
 
-int main()
+int main(int argc, char *argv[])
 {
-    printf("Tiawps sessionkey reader for version %s started\n", VERSION);
+    if(argc != 3)
+    {
+        printf("Usage: %s CONNECTION_PTR_OFFSET SESSIONKEY_OFFSET\n", argv[0]);
+        return;
+    }
+
+    CONNECTION_PTR_OFFSET = atoi(argv[1]);
+    SESSIONKEY_OFFSET = atoi(argv[2]);
 
     char sessionKey[SESSIONKEY_LENGTH] = {'\0'};
 

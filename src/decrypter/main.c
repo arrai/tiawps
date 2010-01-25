@@ -451,9 +451,17 @@ int main(int argc, char *argv[])
         printf("Usage: %s $dumpfile.cap $keyfile.txt\n", argv[0]);
         return 1;
     }
+    char* pcapFile = argv[1];
+    char* keyFile = argv[2];
     
-    readSessionkeyFile(argv[2]);
-    parsePcapFile(argv[1]);
+    char* magicKeyfileStart = "KEY";
+    if(strlen(keyFile) >= 3 && memcmp(keyFile, magicKeyfileStart, 3))
+    {
+        pcapFile = argv[2];
+        keyFile = argv[1];
+    }
+    readSessionkeyFile(keyFile);
+    parsePcapFile(pcapFile);
     removeInvalidConnections();
     dumpConnections();
     decrypt();
