@@ -124,7 +124,7 @@ int main(int argc, char *argv[])
     if(argc != 3)
     {
         printf("Usage: %s CONNECTION_PTR_OFFSET SESSIONKEY_OFFSET\n", argv[0]);
-        return;
+        return 2;
     }
 
     CONNECTION_PTR_OFFSET = atoi(argv[1]);
