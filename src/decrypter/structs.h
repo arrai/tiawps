@@ -1,5 +1,5 @@
 #include <stdint.h>
-#include <netinet/in.h> 
+
 
 #define SESSION_KEY_LENGTH  40
 

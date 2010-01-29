@@ -1,5 +1,11 @@
 #include <stdint.h>
+
+
+#ifdef _WIN32
+#include <Winsock2.h>
+#else
 #include <netinet/in.h>
+#endif
 
 #define PCAP_MAGIC          0xa1b2c3d4
 
