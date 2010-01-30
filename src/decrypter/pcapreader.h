@@ -1,3 +1,6 @@
+#ifndef PCAPREADER_H
+#define PCAPREADER_H
+
 #include <stdint.h>
 
 
@@ -84,3 +87,4 @@ struct sniff_tcp_t {
 struct pcap_hdr_t* readPcapHeader(FILE *f);
 int readNextPacket(FILE *f, struct pcaprec_hdr_t* header, uint8_t **data);
 
+#endif

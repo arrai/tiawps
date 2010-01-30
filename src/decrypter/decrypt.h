@@ -1,3 +1,6 @@
+#ifndef DECRYPT_H
+#define DECRYPT_H
+
 #include <stdint.h>
 #include <openssl/evp.h>
 
@@ -21,3 +24,4 @@ void free_decryption_state(struct decryption_state *);
 void update_decryption(struct decryption_state *state, uint64_t time, uint8_t *data, uint32_t data_len, void *db,
         void(*callback)(uint8_t s2c, uint64_t time, uint16_t opcode, uint8_t *data, uint32_t data_len, void *db));
 
+#endif
