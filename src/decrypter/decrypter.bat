@@ -1,5 +1,5 @@
+@echo off
 echo "Tiawps decrypter"
-
 cd %~dp0
-decrypter.exe %*
+tiawps_decrypter.exe %*
 PAUSE

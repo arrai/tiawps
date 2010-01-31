@@ -1,6 +1,17 @@
 <html>
     <head>
         <title>Tiawps documentation</title>
+        <style>
+            body {
+                color: black;
+                background-color: #888888;
+                margin-left: 50px;
+                margin-right: 50px;
+            }
+            a {
+                color:#990000;
+            }
+        </style>
     </head>
     <body>
         <h1>Tiawps documentation</h1>
@@ -10,11 +21,12 @@
             <li>Get a sniffer which is able to store in the libpcap format. <a href="http://www.tcpdump.org/">Tcpdump</a> and <a href="http://www.wireshark.org/">Wireshark</a> are known to do this.</li>
             <li>Start sniffing everything on TCP port 3724.</li>
             <li>Start wow and log in.</li>
-            <li>Use tiawps_reader.bat to extract the encryption key from the running wow process. A KEY*.txt file will be created.</li>
+            <li>Use reader.bat to extract the encryption key from the running wow process. A KEY*.txt file will be created.</li>
             <li>Play around and do whatever you want to</li>
             <li>Stop wow and stop sniffing</li>
-            <li>Save the sniffer dump in a libpcap compatible format</li>
-            <li>Drag both KEY*.txt and *.cap to tiawps_decrypter.bat</li>
-            <li>You should now see a window which says "Finished decrypting 1 of 1 connections". A *.sqlite should have been created which contains the decrypted session.</li>
+            <li>Save the sniffer dump in a libpcap compatible format<br /> <img src="pic_01.png" /></li>
+            <li>Drag both KEY*.txt and *.cap to decrypter.bat<br /> <img src="pic_02.png" /></li>
+            <li>You should now see a window which says "Finished decrypting 1 of 1 connections". A *.sqlite should have been created which contains the decrypted session.<br />
+                <img src="pic_03.png" /></li>
     </body>
 </html>
