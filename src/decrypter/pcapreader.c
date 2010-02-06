@@ -16,7 +16,7 @@ struct pcap_hdr_t* readPcapHeader(FILE *f)
     }
     if(header->magic_number != PCAP_MAGIC)
     {
-        printf("pcap file has invalid magic number 0x%X\n", header->magic_number);
+        printf("pcap file has invalid magic number 0x%X. Expected 0x%X\n", header->magic_number, PCAP_MAGIC);
         FREE_RETURN
     }
     if(header->version_major != 2 ||

@@ -453,13 +453,15 @@ int main(int argc, char *argv[])
     }
     char* pcapFile = argv[1];
     char* keyFile = argv[2];
-    
-    char* magicKeyfileStart = "KEY";
-    if(strlen(keyFile) >= 3 && memcmp(keyFile, magicKeyfileStart, 3))
+
+    // maybe switched arguments?
+    char* magicKeyfileEnd = "txt";
+    if(strlen(keyFile) >= 3 && memcmp(keyFile+strlen(keyFile)-3, magicKeyfileEnd, 3))
     {
         pcapFile = argv[2];
         keyFile = argv[1];
     }
+
     readSessionkeyFile(keyFile);
     parsePcapFile(pcapFile);
     removeInvalidConnections();
