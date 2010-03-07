@@ -1,1 +1,13 @@
 tiawps is a wow packet sniffer
+--------
+How to compile:
+
+I used dev-cpp to build the executables, but it has been reported it works also with cygwin. However, this
+how-to will stick to dev-cpp
+
+[IF you don't have the sqlite libs natively installed (if in doubt: do it anyway)]
+    *  Open the src/sqlite/sqlite.dev project file with devcpp
+    *  Compile this project
+[/IF]
+*  Do the same with src/decrypter/tiawps_reader.dev
+*  Do the same with src/decrypter/tiawps_decrypter.dev
