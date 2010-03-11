@@ -33,6 +33,11 @@ int readNextPacket(FILE *f, struct pcaprec_hdr_t* header, uint8_t **data)
     {
         return 0;
     }
+    if(header->incl_len != header->orig_len)
+    {
+        printf("Warning: captured only %u of %u bytes! Expect problems!\n", header->incl_len, header->orig_len);
+    }
+
     *data = malloc(header->incl_len);
     if(*data == NULL)
     {
