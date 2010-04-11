@@ -1,5 +1,5 @@
 @echo off
-echo "Tiawps sessionkey reader Build 11403 3.3.2"
+echo "Tiawps sessionkey reader Build 11723 3.3.3"
 
 SET PATH=%~dp0
 REM Switch to drive
@@ -7,5 +7,5 @@ REM Switch to drive
 
 cd %PATH%
 
-tiawps_reader.exe 13186064 1288
+tiawps_reader.exe 12272644 1288
 PAUSE

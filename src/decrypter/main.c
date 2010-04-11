@@ -12,7 +12,7 @@
 
 #define DEBUG               0
 
-const uint8_t MAGIC_WOW_START[] = {0x00, 0x1A, 0xEC, 0x01};
+const uint8_t MAGIC_WOW_START[] = {0x00, 0x2A, 0xEC, 0x01};
 
 static uint8_t SESSIONKEY[SESSION_KEY_LENGTH];
 
