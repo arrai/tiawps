@@ -389,10 +389,12 @@ void decrypt()
         {
             continue;
         }
-        char filename[28];
+        char format[50];
+        sprintf(format, "%%Y_%%m_%%d__%%H_%%M_%%S_%02i.sqlite", i);
+        char filename[sizeof(format)];
         time_t time = connection->to.timeinfo.info[0].epoch_micro/1000000;
         struct tm* timestruct = localtime(&time);
-        strftime (filename, sizeof(filename), "%Y_%m_%d__%H_%M_%S.sqlite", timestruct);
+        strftime (filename, sizeof(filename), format, timestruct);
 
         sqlite3 *db=NULL;
         initDatabase(filename, &db);
