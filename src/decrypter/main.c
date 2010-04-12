@@ -12,6 +12,7 @@
 
 #define DEBUG               0
 
+                                // SIZE  SIZE  CMD   CMD
 const uint8_t MAGIC_WOW_START[] = {0x00, 0x2A, 0xEC, 0x01};
 
 static uint8_t SESSIONKEY[SESSION_KEY_LENGTH];
@@ -190,6 +191,8 @@ void handleTcpPacket(uint32_t from, uint32_t to, uint16_t tcp_len, struct sniff_
             printf("start_seq = %u\n", connection->from.start_seq);
 
             connection->state = SYNED;
+
+            connection->forwarded = 0;
 
             connection->from.data.buffer= NULL;
             connection->from.data.buffersize= 0;
@@ -380,11 +383,54 @@ void removeInvalidConnections()
     }
 }
 
+struct tcp_connection *currentDecryptedConnection;
+
+void decryptCallback(uint8_t s2c, uint64_t time, uint16_t opcode, uint8_t *data, uint32_t data_len, void *db)
+{
+    insertPacket(s2c, time, opcode, data, data_len, db);
+
+    if(!s2c)
+        return;
+
+    // some packets need some extra treatment
+
+    switch(opcode)
+    {
+        // forwarding connection
+        case 1293:
+        {
+            const uint32_t expected_size = 4+2+4+20;
+            if(data_len != expected_size)
+            {
+                printf("WARNING: packet 1293 is %u bytes long, but we expected %u\n", data_len, expected_size);
+                return;
+            }
+            uint32_t fwd_addr = *(data)<<24 | *(data+1)<<16 | *(data+2) << 8 | *(data+3);
+            uint16_t fwd_port = ntohs(*((uint16_t*)(data+4)));
+            // find the connection
+            for(uint32_t i=0; i<connection_count; ++i)
+            {
+                struct tcp_connection *connection = connections[i];
+                if(connection->to.address == fwd_addr &&
+                    connection->to.port == fwd_port)
+                {
+                    printf("Set connection forwarding bit on %s:%u\n", addrToStr(fwd_addr), ntohs(fwd_port));
+                    connection->forwarded = 1;
+                    return;
+                }
+            }
+            printf("WARNING: couldn't find referenced forward connection to %s:%u\n", addrToStr(fwd_addr), ntohs(fwd_port));
+            break;
+        }
+    }
+}
+
 void decrypt()
 {
     for(uint32_t i=0; i<connection_count; ++i)
     {
         struct tcp_connection *connection = connections[i];
+        currentDecryptedConnection = connection;
         if(connection->to.timeinfo.entries <1)
         {
             continue;
@@ -400,8 +446,38 @@ void decrypt()
         initDatabase(filename, &db);
 
         struct decryption_state client_state, server_state;
-        init_decryption_state_server(&server_state, SESSIONKEY);
-        init_decryption_state_client(&client_state, SESSIONKEY);
+        uint8_t custom_serverseed[16];
+        uint8_t custom_clientseed[16];
+
+        if(connection->forwarded)
+        {
+            const uint32_t expected_size = 2+2*4+2*16;
+            uint8_t* data = connection->to.data.buffer;
+            uint32_t size = data[0]<<8 | data[1];
+            uint32_t opcode = data[3]<<8 | data[2];
+            if(opcode != 492)
+            {
+                printf("WARNING: first packet in stream is not 492 but %u\n", opcode);
+                continue;
+            }
+            if(size != expected_size)
+            {
+                printf("WARNING: packet 492 is %u bytes long, but we expected %u\n", size, expected_size);
+                continue;
+            }
+            memcpy(custom_serverseed, data+4+2*4, 16);
+            memcpy(custom_clientseed, data+4+2*4+16, 16);
+            printf("Using custom seeds for forwarded connection\n");
+
+            init_decryption_state_server(&server_state, SESSIONKEY, custom_serverseed);
+            init_decryption_state_client(&client_state, SESSIONKEY, custom_clientseed);
+        }
+        else
+        {
+            init_decryption_state_server(&server_state, SESSIONKEY, NULL);
+            init_decryption_state_client(&client_state, SESSIONKEY, NULL);
+        }
+
 
         uint32_t client_ti_counter=0, server_ti_counter=0;
         while(client_ti_counter < connection->from.timeinfo.entries ||
@@ -436,7 +512,7 @@ void decrypt()
             {
                 datalen = participant->data.buffersize - participant->timeinfo.info[ti_counter].sequence;
             }
-            update_decryption(nextState, participant->timeinfo.info[ti_counter].epoch_micro, data, datalen, db, insertPacket);
+            update_decryption(nextState, participant->timeinfo.info[ti_counter].epoch_micro, data, datalen, db, decryptCallback);
         }
         freeDatabase(&db);
 

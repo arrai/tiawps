@@ -17,8 +17,8 @@ struct decryption_state
     EVP_CIPHER_CTX key;
 };
 
-void init_decryption_state_server(struct decryption_state *state, uint8_t *sessionkey);
-void init_decryption_state_client(struct decryption_state *state, uint8_t *sessionkey);
+void init_decryption_state_server(struct decryption_state *state, uint8_t *sessionkey, uint8_t* customseed);
+void init_decryption_state_client(struct decryption_state *state, uint8_t *sessionkey, uint8_t* customseed);
 void free_decryption_state(struct decryption_state *);
 
 void update_decryption(struct decryption_state *state, uint64_t time, uint8_t *data, uint32_t data_len, void *db,

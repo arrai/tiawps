@@ -45,6 +45,7 @@ struct tcp_connection
 {
     struct tcp_participant from, to;
     enum tcp_state state;
+    uint8_t forwarded;
 };
 
 #endif

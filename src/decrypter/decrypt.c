@@ -25,6 +25,10 @@ void free_decryption_state(struct decryption_state *this)
 
 void init_decryption_state(struct decryption_state *this, uint8_t *sessionkey, const uint8_t *seed)
 {
+    printf("seed: ");
+    for(int i=0; i<SEED_KEY_SIZE; ++i)
+        printf("%02X ", seed[i]);
+    printf("\n");
     this->buffer = NULL;
     this->bufferSize = 0;
     this->decryptedHeaderBytes = 0;
@@ -51,10 +55,6 @@ void init_decryption_state(struct decryption_state *this, uint8_t *sessionkey, c
         HMAC_CTX_cleanup(&m_ctx);
     }
 
-    printf("m_digest: ");
-    for(int i=0; i<SHA_DIGEST_LENGTH; ++i)
-        printf("%02X ", m_digest[i]);
-    printf("\n");
     // constructor
     EVP_CIPHER_CTX_init(&this->key);
     EVP_EncryptInit_ex(&this->key, EVP_rc4(), NULL, NULL, NULL);
@@ -71,18 +71,18 @@ void init_decryption_state(struct decryption_state *this, uint8_t *sessionkey, c
     }
 }
 
-void init_decryption_state_server(struct decryption_state *this, uint8_t *sessionkey)
+void init_decryption_state_server(struct decryption_state *this, uint8_t *sessionkey, uint8_t *customseed)
 {
     this->s2c = 1;
     this->opcodeLen = 2;
-    init_decryption_state(this, sessionkey, serverSeed);
+    init_decryption_state(this, sessionkey, customseed?customseed:serverSeed);
 }
 
-void init_decryption_state_client(struct decryption_state *this, uint8_t *sessionkey)
+void init_decryption_state_client(struct decryption_state *this, uint8_t *sessionkey, uint8_t *customseed)
 {
     this->s2c = 0;
     this->opcodeLen = 4;
-    init_decryption_state(this, sessionkey, clientSeed);
+    init_decryption_state(this, sessionkey, customseed?customseed:clientSeed);
 }
 
 void update_decryption(struct decryption_state *this, uint64_t time, uint8_t *data, uint32_t data_len, void *db,
@@ -148,7 +148,6 @@ void update_decryption(struct decryption_state *this, uint64_t time, uint8_t *da
         }
 
 
-        printf("%u, buffersize = %u, len= %u\n", this->s2c, this->bufferSize, payloadLen);
         if(this->bufferSize+this->opcodeLen-this->decryptedHeaderBytes >= payloadLen)
         {
             callback(this->s2c, time, opcode, this->buffer+this->decryptedHeaderBytes, payloadLen-this->opcodeLen, db);
