@@ -60,6 +60,19 @@ void insertClientBuild(uint8_t *data, uint32_t data_len, sqlite3 *db)
     sprintf(buffer, insertFormat, *clientBuild);
     executeSql(db, buffer);
     free(buffer);
+
+    //FIXME make sniffitzt happy
+    char sql[512];
+    sprintf(sql, "insert into header values ('clientLang', '%s')", "");
+    executeSql(db, sql);
+    sprintf(sql, "insert into header values ('accountName', '%s')", (char*)(data+8));//FIXME
+    executeSql(db, sql);
+    sprintf(sql, "insert into header values ('realmName', '%s')", "");
+    executeSql(db, sql);
+    sprintf(sql, "insert into header values ('realmServer', '%s')", "");
+    executeSql(db, sql);
+    sprintf(sql, "insert into header values ('snifferVersion', '%s')", "");
+    executeSql(db, sql);
 }
 
 void insertPacket(uint8_t s2c, uint64_t time, uint16_t opcode, uint8_t *data, uint32_t data_len, void* arg)
@@ -83,7 +96,7 @@ void insertPacket(uint8_t s2c, uint64_t time, uint16_t opcode, uint8_t *data, ui
 
     free(queryBuffer);
 
-    if(opcode == 493)
+    if(opcode == 0x3000) //CMSG_AUTH_SESSION //493)
         insertClientBuild(data, data_len, db);
 }
 
