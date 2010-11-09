@@ -161,7 +161,7 @@ void removeConnection(struct tcp_connection *connection)
 void handleTcpPacket(uint32_t from, uint32_t to, uint16_t tcp_len, struct sniff_tcp_t *tcppacket, uint64_t epoch_micro_secs)
 {
     struct tcp_connection *connection = NULL;
-    for(uint8_t i=0; i< connection_count; ++i)
+    for(uint32_t i=0; i< connection_count; ++i)
     {
         if((connections[i]->from.address == from && connections[i]->to.address == to &&
                     connections[i]->from.port == tcppacket->th_sport && connections[i]->to.port == tcppacket->th_dport)
